@@ -25,6 +25,8 @@ public class Classes {
 	private String dateOfClass;
 	@Column(name = "SLOT")
 	private String slotOfClass;
+	@Column(name = "COST")
+	private int costOfClass;
 	
 	public int getId() {
 		return id;
@@ -61,6 +63,12 @@ public class Classes {
 	}
 	public void setSlotOfClass(String slotOfClass) {
 		this.slotOfClass = slotOfClass;
+	}
+	public int getCostOfClass() {
+		return costOfClass;
+	}
+	public void setCostOfClass(int costOfClass) {
+		this.costOfClass = costOfClass;
 	}
 	
 }

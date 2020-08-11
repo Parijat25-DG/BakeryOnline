@@ -28,7 +28,7 @@ public class Parties {
 	@Column(name = "TYPE")
 	private String typeOfParty;
 	@Column(name = "PACKAGE")
-	private String partyPackage;
+	private int partyPackage;
 	
 	public int getId() {
 		return id;
@@ -73,10 +73,10 @@ public class Parties {
 	public void setTypeOfParty(String typeOfParty) {
 		this.typeOfParty = typeOfParty;
 	}
-	public String getPartyPackage() {
+	public int getPartyPackage() {
 		return partyPackage;
 	}
-	public void setPartyPackage(String partyPackage) {
+	public void setPartyPackage(int partyPackage) {
 		this.partyPackage = partyPackage;
 	}
 	

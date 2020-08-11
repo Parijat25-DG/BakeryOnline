@@ -9,8 +9,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.spring.postgresql.api.data.DataAccessHandler;
-import com.spring.postgresql.api.dto.OrderRequest;
-import com.spring.postgresql.api.dto.OrderResponse;
+import com.spring.postgresql.api.dto.BookingResponse;
+import com.spring.postgresql.api.dto.ClassBookingRequest;
+import com.spring.postgresql.api.dto.OrderBookingRequest;
+import com.spring.postgresql.api.dto.PartyBookingRequest;
 import com.spring.postgresql.api.repository.OrderRepository;
 
 @RestController
@@ -24,13 +26,23 @@ public class OrderController {
 	private DataAccessHandler dataAccessHandler;
 
 	@GetMapping("/getOrderDetails/{orderId}")
-	public OrderResponse fetchOrderDetails(@PathVariable String orderId){
+	public BookingResponse fetchOrderDetails(@PathVariable String orderId){
 		return dataAccessHandler.mapOrderResponseDetails(orderRepository.findByOrderId(Integer.parseInt(orderId)));
 	}
 
 	@PostMapping("/saveOrderDetails")
-	public int saveOrderDetails(@RequestBody OrderRequest request) {
-		return orderRepository.save(dataAccessHandler.mapOrderRequestDetails(request)).getId();
+	public BookingResponse saveOrderDetails(@RequestBody OrderBookingRequest request) {
+		return dataAccessHandler.saveOrderBooking(request);
+	}
+	
+	@PostMapping("/saveClassDetails")
+	public BookingResponse saveClassDetails(@RequestBody ClassBookingRequest request) {
+		return dataAccessHandler.saveClassBooking(request);
+	}
+	
+	@PostMapping("/savePartyDetails")
+	public BookingResponse savePartyDetails(@RequestBody PartyBookingRequest request) {
+		return dataAccessHandler.savePartyBooking(request);
 	}
 
 }

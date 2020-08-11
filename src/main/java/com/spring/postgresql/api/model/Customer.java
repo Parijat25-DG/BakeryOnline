@@ -25,8 +25,6 @@ public class Customer {
 	private String phone;
 	@Column(name = "MEMBERSHIP")
 	private String membership;
-	@Column(name = "DISCOUNT")
-	private int discount;
 	
 	public int getId() {
 		return id;
@@ -63,12 +61,6 @@ public class Customer {
 	}
 	public void setMembership(String membership) {
 		this.membership = membership;
-	}
-	public int getDiscount() {
-		return discount;
-	}
-	public void setDiscount(int discount) {
-		this.discount = discount;
 	}
 	
 }

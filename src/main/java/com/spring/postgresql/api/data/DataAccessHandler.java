@@ -1,15 +1,17 @@
 package com.spring.postgresql.api.data;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
+import java.util.Map.Entry;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.spring.postgresql.api.dto.OrderRequest;
-import com.spring.postgresql.api.dto.OrderResponse;
+import com.spring.postgresql.api.dto.BookingResponse;
+import com.spring.postgresql.api.dto.ClassBookingRequest;
+import com.spring.postgresql.api.dto.OrderBookingRequest;
+import com.spring.postgresql.api.dto.PartyBookingRequest;
 import com.spring.postgresql.api.model.Classes;
 import com.spring.postgresql.api.model.Customer;
 import com.spring.postgresql.api.model.Items;
@@ -19,112 +21,141 @@ import com.spring.postgresql.api.model.Shops;
 import com.spring.postgresql.api.repository.ClassRepository;
 import com.spring.postgresql.api.repository.CustomerRepository;
 import com.spring.postgresql.api.repository.ItemRepository;
+import com.spring.postgresql.api.repository.OrderRepository;
 import com.spring.postgresql.api.repository.PartyRepository;
 import com.spring.postgresql.api.repository.ShopRepository;
 
 @Component
 public class DataAccessHandler {
-	
+
 	@Autowired
 	private CustomerRepository customerRepository;
-	
+
 	@Autowired
 	private ShopRepository shopRepository;
-	
+
 	@Autowired
 	private ItemRepository itemRepository;
-	
+
 	@Autowired
 	private ClassRepository classRepository;
-	
+
 	@Autowired
 	private PartyRepository partyRepository;
 	
-	public Order mapOrderRequestDetails(OrderRequest request){
+	@Autowired
+	private OrderRepository orderRepository;
+
+	public BookingResponse saveOrderBooking(OrderBookingRequest request) {
 		Order order = new Order();
 		order.setCategory(request.getCategory());
-		if(request.getClassId() == 0) {
-			order.setClassId(0);
-		} else {
-			order.setClassId(request.getClassId());
-		}
-		order.setCustomerId(request.getCustomerId());
 		order.setDate(request.getDate());
 		order.setDeliveryMode(request.getDeliveryMode());
-		if(request.getPartyId() == 0) {
-			order.setPartyId(0);
-		} else {
-			order.setPartyId(request.getPartyId());
-		}
 		order.setPaymentMode(request.getPaymentMode());
-		if(request.getShopId() == 0) {
-			order.setShopId(0);
-		} else {
-			order.setPartyId(request.getPartyId());
+		
+		Customer customer = customerRepository.findByNameAndEmail(request.getCustomerName(), request.getCustomerEmail());
+		order.setCustomerId(customer.getId());
+		
+		Shops shop = shopRepository.findByShopLocation(request.getShopLocation());
+		order.setShopId(shop.getId());
+		
+		StringBuilder items = new StringBuilder();
+		int itemCost = 0;
+		for(Entry<String, Integer> entrySet : request.getItemDetails().entrySet()) {
+			Items item = itemRepository.findByName(entrySet.getKey());
+			int pricePerItem = item.getPrice();
+			itemCost = itemCost + pricePerItem*entrySet.getValue();
+			items.append(item.getName()).append(",");
 		}
-		order.setTotalAmount(request.getTotalAmount());
-		List<String> itemNames = new ArrayList<>();
-		for(Integer itemId : request.getItemIds()) {
-			Items items = itemRepository.findByItemId(itemId);
-			itemNames.add(items.getName());
-		}
-		order.setItems(String.join(",", itemNames));
-		return order;
+		order.setItems(items.toString());
+		order.setTotalAmount(itemCost);
+		
+		Order savedOrder = orderRepository.save(order);
+		BookingResponse response = new BookingResponse();
+		response.setBookingId(savedOrder.getId());
+		response.setTotalAmount(itemCost);
+		response.setBookingStatus("CREATED");
+		return response;
 	}
-	
-	public OrderResponse mapOrderResponseDetails(Order orderDetails) {
-		OrderResponse orderResponse = new OrderResponse();
+
+	public BookingResponse savePartyBooking(PartyBookingRequest request) {
+		Order order = new Order();
+		order.setCategory(request.getCategory());
+		order.setDate(request.getDate());
 		
-		orderResponse.setId(orderDetails.getId());
-		orderResponse.setDate(orderDetails.getDate());
-		orderResponse.setTotalAmount(orderDetails.getTotalAmount());
-		orderResponse.setPaymentMode(orderDetails.getPaymentMode());
-		orderResponse.setOrderStatus(orderDetails.getOrderStatus());
-		orderResponse.setCategory(orderDetails.getCategory());
+		Customer customer = customerRepository.findByNameAndEmail(request.getCustomerName(), request.getCustomerEmail());
+		order.setCustomerId(customer.getId());
 		
-		Customer customerDetails = customerRepository.findByCustomerId(orderDetails.getCustomerId());
-		
-		orderResponse.setCustomerName(customerDetails.getName());
-		orderResponse.setCustomerAddress(customerDetails.getAddress());
-		orderResponse.setCustomerEmail(customerDetails.getEmail());
-		orderResponse.setCustomerPhone(customerDetails.getPhone());
-		
-		if(orderDetails.getCategory().equalsIgnoreCase("individual")) {
-			orderResponse.setDeliveryMode(orderDetails.getDeliveryMode());
-			Shops shopDetails = shopRepository.findByShopId(orderDetails.getShopId());
-			orderResponse.setShopLocation(shopDetails.getLocation());
-			Map<String, Integer> itemDetails = new HashMap<>();
-			String items = orderDetails.getItems();
-			String[] itemArray = items.split(",");
-			for(String item : itemArray) {
-				Items itemObj = itemRepository.findByName(item);
-				itemDetails.put(itemObj.getName(), itemObj.getPrice());
+		int partyCost = 0;
+		int partyId = 0;
+		List<Parties> parties = partyRepository.findByType(request.getTypeOfParty());
+		for(Parties party : parties) {
+			if(party.getLocation().equalsIgnoreCase(request.getPartyLocation())) {
+				Collection<String> cuisines = new ArrayList<String>();
+				cuisines.add(party.getCuisineOne());
+				cuisines.add(party.getCuisineTwo());
+				cuisines.add(party.getCuisineThree());
+				if(request.getPartyCuisineList().containsAll(cuisines)) {
+					if(request.getGuests()>=party.getGuests()) {
+						partyCost = partyCost+party.getPartyPackage()*request.getGuests();
+						partyId = party.getId();
+					}
+				}
 			}
-			orderResponse.setItemDetails(itemDetails);
-			
-		} else if(orderDetails.getCategory().equalsIgnoreCase("class")) {
-			Classes classDetails = classRepository.findByClassId(orderDetails.getClassId());
-			orderResponse.setClassLocation(classDetails.getLocation());
-			orderResponse.setCuisineToLearn(classDetails.getCuisine());
-			orderResponse.setDateOfClass(classDetails.getDateOfClass());
-			orderResponse.setSlotOfClass(classDetails.getSlotOfClass());
-			
-		} else if(orderDetails.getCategory().equalsIgnoreCase("party")) {
-			Parties partyDetails = partyRepository.findByPartyId(orderDetails.getPartyId());
-			orderResponse.setPartyLocation(partyDetails.getLocation());
-			List<String> cuisineList = new ArrayList<>();
-			cuisineList.add(partyDetails.getCuisineOne());
-			if(!partyDetails.getCuisineTwo().equalsIgnoreCase("NA")) {
-				cuisineList.add(partyDetails.getCuisineTwo());
-			}
-			if(!partyDetails.getCuisineThree().equalsIgnoreCase("NA")) {
-				cuisineList.add(partyDetails.getCuisineThree());
-			}
-			orderResponse.setPartyCuisineList(cuisineList );
-			orderResponse.setGuests(partyDetails.getGuests());
-			orderResponse.setTypeOfParty(partyDetails.getTypeOfParty());
 		}
-		return orderResponse;
+		order.setPartyId(partyId);
+		order.setTotalAmount(partyCost);
+		
+		Order savedOrder = orderRepository.save(order);
+		BookingResponse response = new BookingResponse();
+		response.setBookingId(savedOrder.getId());
+		response.setTotalAmount(partyCost);
+		response.setBookingStatus("PAID");
+		return response;
+	}
+
+	public BookingResponse saveClassBooking(ClassBookingRequest request) {
+		Order order = new Order();
+		order.setCategory(request.getCategory());
+		order.setDate(request.getDate());
+		
+		Customer customer = customerRepository.findByNameAndEmail(request.getCustomerName(), request.getCustomerEmail());
+		order.setCustomerId(customer.getId());
+		
+		int classCost = 0;
+		int classId = 0;
+		List<Classes> classes = classRepository.findByCuisine(request.getCuisineToLearn());
+		for(Classes aclass : classes) {
+			request.getDateOfClass();
+			request.getSlotOfClass();
+			if(aclass.getSeatsAvailable()>0) {
+				if(aclass.getLocation().equalsIgnoreCase(request.getClassLocation())
+					&& aclass.getSlotOfClass().equalsIgnoreCase(request.getSlotOfClass())
+						&& aclass.getDateOfClass().equalsIgnoreCase(request.getDateOfClass())) {
+					classId = aclass.getId();
+					classCost = aclass.getCostOfClass();
+				}
+					
+			}
+		}
+		order.setClassId(classId);
+		order.setTotalAmount(classCost);
+		
+		Order savedOrder = orderRepository.save(order);
+		BookingResponse response = new BookingResponse();
+		response.setBookingId(savedOrder.getId());
+		response.setTotalAmount(classCost);
+		response.setBookingStatus("BOOKED");
+		return response;
+	}
+
+	public BookingResponse mapOrderResponseDetails(Order order) {
+		BookingResponse response = new BookingResponse();
+		Order savedOrder = orderRepository.findById(order.getId()).get();
+		response.setBookingId(savedOrder.getId());
+		response.setTotalAmount(savedOrder.getTotalAmount());
+		response.setBookingStatus(savedOrder.getOrderStatus());
+		return response;
 	}
 
 }
